@@ -7,7 +7,7 @@ from app.models.user_model import User
 from app.models.employee_model import Employee
 from app.models.attendance_model import Attendance
 from app.models.payroll_model import Payroll
-
+from app.models.session_model import SessionLog
 from app.routes.test_routes import router as test_router
 from app.routes.auth_routes import router as auth_router
 from app.routes.employee_routes import router as employee_router

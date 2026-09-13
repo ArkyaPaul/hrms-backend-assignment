@@ -4,7 +4,7 @@ from sqlalchemy import String # type: ignore
 from sqlalchemy import Float # type: ignore
 from sqlalchemy import Date # type: ignore
 from sqlalchemy import Boolean # type: ignore
-
+from sqlalchemy import ForeignKey # type: ignore
 from app.database import Base
 
 
@@ -13,6 +13,13 @@ class Employee(Base):
     __tablename__ = "employees"
 
     id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False
+    )
 
     employee_id = Column(
         String,

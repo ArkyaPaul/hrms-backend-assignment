@@ -1,12 +1,13 @@
 from fastapi import Depends # type: ignore
 from fastapi import HTTPException # type: ignore
 
-from app.auth.oauth2 import get_current_user
+from app.auth.oauth2 import get_current_session, get_current_user
 
 
 def role_required(allowed_roles: list):
 
     def checker(
+        current_session = Depends(get_current_session),
         current_user = Depends(get_current_user)
     ):
 

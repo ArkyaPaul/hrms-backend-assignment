@@ -1,13 +1,19 @@
+from datetime import datetime, timezone
+import uuid
+
 from fastapi import APIRouter # type: ignore
 from fastapi import Depends # type: ignore
-from fastapi import HTTPException # type: ignore
-from app.auth.oauth2 import get_current_user # type: ignore
+from fastapi import HTTPException
+from sqlalchemy import desc # type: ignore
+from app.auth.oauth2 import get_current_session, get_current_user # type: ignore
 from fastapi.security import OAuth2PasswordRequestForm # type: ignore
 from sqlalchemy.orm import Session # type: ignore
 
 from app.dependencies import get_db
 
 from app.models.user_model import User
+
+from app.models.session_model import SessionLog
 
 from app.schemas.user_schema import UserRegister, UserLogin
 
@@ -90,11 +96,25 @@ def login_user(
             detail="Invalid Password"
         )
 
+    session_id = uuid.uuid4()
+    
+    newSession = SessionLog(
+        session_id=session_id,
+        user_id = existing_user.id
+    )
+
+    db.add(newSession)
+    
+    db.commit()
+    
+    db.refresh(newSession)
+
     access_token = create_access_token(
         {
             "user_id": existing_user.id,
             "role": existing_user.role,
-            "email": existing_user.email
+            "email": existing_user.email,
+            "session_id": str(session_id)
         }
     )
 
@@ -107,12 +127,30 @@ def login_user(
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "session_id": session_id
+    }
+
+@router.get("/logout")
+def logout_user(
+    current_session = Depends(get_current_session),
+    db: Session = Depends(get_db)
+):
+
+    current_session.logout_time = datetime.now(timezone.utc)
+    current_session.last_seen = datetime.now(timezone.utc)
+    current_session.status = "LOGGED_OUT"
+
+    db.commit()
+
+    return {
+        "message": "Logout successful"
     }
 
 @router.get("/me")
 def get_logged_in_user(
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    current_session = Depends(get_current_session)
 ):
 
     return {
@@ -147,11 +185,27 @@ def refresh_access_token(
         )
     
     user = db.query(User).filter(User.id == payload.get("user_id")).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    session = db.query(SessionLog).filter(SessionLog.user_id == user.id).order_by(desc(SessionLog.login_time)).first()
+
+    if not session or session.status == "LOGGED_OUT":
+        raise HTTPException(
+            status_code=401,
+            detail="No active session found"
+        )
+
     new_access_token = create_access_token(
         {
             "user_id": user.id,
             "role": user.role,
-            "email": user.email
+            "email": user.email,
+            "session_id": str(session.session_id)
         }
     )
 

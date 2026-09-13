@@ -8,6 +8,7 @@ from app.dependencies import get_db
 
 from app.models.employee_model import Employee
 
+from app.models.user_model import User
 from app.schemas.employee_schema import EmployeeCreate,EmployeeUpdate
 
 from app.auth.rbac import role_required
@@ -26,6 +27,16 @@ def create_employee(
         role_required(["admin", "hr"])
     )
 ):
+
+    user = db.query(User).filter(
+        User.email == employee.email
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="No user found with this email"
+        )
 
     existing_employee = db.query(Employee).filter(
         Employee.email == employee.email
@@ -50,6 +61,8 @@ def create_employee(
     )
 
     new_employee.employee_id = (f"{new_employee.department[:3].upper()}_{random.randint(1000, 9999)}")
+
+    new_employee.user_id = user.id
 
     db.add(new_employee)
 
